@@ -107,6 +107,7 @@ async function fetchRooms(user){
   if(error) throw error;
   return (data||[]).map(r=>mapRoom(r, user));
 }
+
 // Initialize the Gemini client using your Vite environment variable
 async function callClaude(messages, system = "") {
   try {
@@ -118,7 +119,11 @@ async function callClaude(messages, system = "") {
 
     // Combine system prompt if it exists
     const fullPrompt = system ? `System Instructions: ${system}\n\n${formattedContents}` : formattedContents;
-
+  } catch (error) {
+    console.error("Error communicating with Gemini AI:", error);
+    return "Sorry, couldn't get a response due to an error.";
+  }
+}
 // Function to call Gemini with automatic retries if a 503 error hits
 async function callGeminiWithRetry(aiClient, payload, retries = 3, delay = 1000) {
   for (let i = 0; i < retries; i++) {
@@ -134,20 +139,12 @@ async function callGeminiWithRetry(aiClient, payload, retries = 3, delay = 1000)
       throw error; // If it's another error or out of retries, throw it
     }
   }
-}
-    // Add 'const response =' right before the call:
+
 const response = await callGeminiWithRetry(ai, {
   model: 'gemini-3.5-flash',
-  contents: [...]
+  contents: chatHistory
 });
-
-// Now this line will work perfectly!
-return response.text;
-    return response.text || "Sorry, couldn't get a response.";
-  } catch (error) {
-    console.error("Error communicating with Gemini AI:", error);
-    return "Sorry, couldn't get a response due to an error.";
-  }
+return response.text || "Sorry, couldn't get a response.";
 }
 
 function matchQ(fields,q){ if(!q)return true; const l=q.toLowerCase(); return fields.some(f=>f&&f.toLowerCase().includes(l)); }
