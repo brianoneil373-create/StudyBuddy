@@ -120,7 +120,7 @@ async function callClaude(messages, system = "") {
     const fullPrompt = system ? `System Instructions: ${system}\n\n${formattedContents}` : formattedContents;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash', // Fast, powerful, and completely free tier friendly
+      model: 'gemini-3.5-flash', // Fast, powerful, and completely free tier friendly
       contents: fullPrompt,
     });
     
@@ -418,7 +418,7 @@ function StudyRoom({room,user,T,onLeave,showToast}){
       const b64=ev.target.result.split(",")[1];
       try{
         const response = await ai.models.generateContent({
-          model: 'gemini-3.8-flash',
+          model: 'gemini-3.5-flash',
           contents: [
             {
               inlineData: {
