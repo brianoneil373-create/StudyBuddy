@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { supabase } from "./supabase";
-
+import { GoogleGenAI } from '@google/genai';
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 // ─── Theme ────────────────────────────────────────────────────────────────────
 const LIGHT = {
   bg:"#f7f7f5", surface:"#ffffff", border:"#ebebeb", text:"#111111",
@@ -107,12 +108,30 @@ async function fetchRooms(user){
   return (data||[]).map(r=>mapRoom(r, user));
 }
 
-async function callClaude(messages,system=""){
-  const body={model:"claude-sonnet-4-20250514",max_tokens:1000,messages};
-  if(system)body.system=system;
-  const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-  const d=await r.json();
-  return d.content?.map(b=>b.text||"").join("")||"Sorry, couldn't get a response.";
+import { GoogleGenAI } from '@google/genai';
+
+// Initialize the Gemini client using your Vite environment variable
+async function callClaude(messages, system = "") {
+  try {
+    // Format the incoming messages into what Gemini expects
+    let formattedContents = messages;
+    if (Array.isArray(messages)) {
+      formattedContents = messages.map(m => `${m.role || 'user'}: ${m.content}`).join('\n');
+    }
+
+    // Combine system prompt if it exists
+    const fullPrompt = system ? `System Instructions: ${system}\n\n${formattedContents}` : formattedContents;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash', // Fast, powerful, and completely free tier friendly
+      contents: fullPrompt,
+    });
+    
+    return response.text || "Sorry, couldn't get a response.";
+  } catch (error) {
+    console.error("Error communicating with Gemini AI:", error);
+    return "Sorry, couldn't get a response due to an error.";
+  }
 }
 
 function matchQ(fields,q){ if(!q)return true; const l=q.toLowerCase(); return fields.some(f=>f&&f.toLowerCase().includes(l)); }
@@ -401,16 +420,31 @@ function StudyRoom({room,user,T,onLeave,showToast}){
     reader.onload=async(ev)=>{
       const b64=ev.target.result.split(",")[1];
       try{
-        const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,messages:[{role:"user",content:[{type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}},{type:"text",text:"Extract the full readable text of this PDF. Just the text."}]}]})});
-        const d=await res.json();
-        const text=d.content?.map(b=>b.text||"").join("")||"";
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: [
+            {
+              inlineData: {
+                mimeType: "application/pdf",
+                data: b64
+              }
+            },
+            {
+              text: "Extract the full readable text of this PDF. Just the text."
+            }
+          ]
+        });
+        const text = response.text || "";
         const nr={id:Date.now(),name:file.name,uploader:"You",avatar:"?",size:`${(file.size/1024/1024).toFixed(1)} MB`,_text:text};
         setResources(p=>[nr,...p]);
         setActiveRes(nr);setPdfText(text);setActivePanel("ai");
         setAiMsgs([{role:"assistant",content:`I've read **${file.name}**. Ask me anything — summaries, explanations, practice questions, key concepts!`}]);
         showToast("File uploaded & ready!");
         await supabase.from("messages").insert({room_id:room.id, user_id:user.id, content:`📄 Shared a resource: ${file.name}`});
-      }catch{showToast("Upload failed");}
+      }catch(err){
+        console.error("PDF upload error:", err);
+        showToast("Upload failed");
+      }
       setUploading(false);
     };
     reader.readAsDataURL(file);
