@@ -135,7 +135,14 @@ async function callGeminiWithRetry(aiClient, payload, retries = 3, delay = 1000)
     }
   }
 }
-    
+    // Add 'const response =' right before the call:
+const response = await callGeminiWithRetry(ai, {
+  model: 'gemini-3.5-flash',
+  contents: [...]
+});
+
+// Now this line will work perfectly!
+return response.text;
     return response.text || "Sorry, couldn't get a response.";
   } catch (error) {
     console.error("Error communicating with Gemini AI:", error);
