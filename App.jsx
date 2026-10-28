@@ -119,10 +119,22 @@ async function callClaude(messages, system = "") {
     // Combine system prompt if it exists
     const fullPrompt = system ? `System Instructions: ${system}\n\n${formattedContents}` : formattedContents;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash', // Fast, powerful, and completely free tier friendly
-      contents: fullPrompt,
-    });
+// Function to call Gemini with automatic retries if a 503 error hits
+async function callGeminiWithRetry(aiClient, payload, retries = 3, delay = 1000) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await aiClient.models.generateContent(payload);
+    } catch (error) {
+      // If it's a 503 (Unavailable) and we have retries left, wait and try again
+      const is503 = error.message?.includes('503') || error.status === 503;
+      if (is503 && i < retries - 1) {
+        await new Promise(resolve => setTimeout(resolve, delay * (i + 1))); // Wait 1s, then 2s...
+        continue;
+      }
+      throw error; // If it's another error or out of retries, throw it
+    }
+  }
+}
     
     return response.text || "Sorry, couldn't get a response.";
   } catch (error) {
@@ -417,8 +429,7 @@ function StudyRoom({room,user,T,onLeave,showToast}){
     reader.onload=async(ev)=>{
       const b64=ev.target.result.split(",")[1];
       try{
-        const response = await ai.models.generateContent({
-          model: 'gemini-3.5-flash',
+        const response = await callGeminiWithRetry(ai, {          model: 'gemini-3.5-flash',
           contents: [
             {
               inlineData: {
