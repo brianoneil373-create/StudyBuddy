@@ -107,9 +107,6 @@ async function fetchRooms(user){
   if(error) throw error;
   return (data||[]).map(r=>mapRoom(r, user));
 }
-
-import { GoogleGenAI } from '@google/genai';
-
 // Initialize the Gemini client using your Vite environment variable
 async function callClaude(messages, system = "") {
   try {
